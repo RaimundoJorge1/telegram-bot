@@ -1,124 +1,74 @@
 import os
-import threading
-from flask import Flask
-import telebot
-import pg8000
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from telegram.ext import Updater, MessageHandler, Filters
 
 # ============================
-# LOGS DO TELEBOT (MOSTRA ERROS)
+# Conexão com o banco (Render)
 # ============================
-telebot.logger.setLevel(10)
 
-# ============================
-# TOKEN DO TELEGRAM
-# ============================
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = telebot.TeleBot(TOKEN)
-
-# ============================
-# CONEXÃO COM O BANCO
-# ============================
-def conectar():
-    return pg8000.connect(
+def get_connection():
+    return psycopg2.connect(
         host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASS"),
-        database=os.getenv("DB_NAME"),
-        port=int(os.getenv("DB_PORT", "5432"))
+        port=os.getenv("DB_PORT"),
+        sslmode="require"   # <<< ESSENCIAL PARA O RENDER
     )
 
 # ============================
-# FUNÇÃO PARA PREPARAR TEXTO
+# Função que processa mensagens
 # ============================
-def preparar(valor):
-    valor = valor.lower()
-    valor = valor.replace(".", "").replace(",", "").replace(" ", "").replace("-", "")
-    return f"%{valor}%"
 
-# ============================
-# COMANDO /start
-# ============================
-@bot.message_handler(commands=['start'])
-def start(msg):
-    bot.reply_to(msg,
-        "Envie os filtros no formato:\n\n"
-        "bitola;isolacao;tensao;cor;fabricante\n\n"
-        "Exemplo:\n1.5;PVC;750;Preta;PHELPS DODGE"
-    )
-
-# ============================
-# RECEBER MENSAGENS
-# ============================
-@bot.message_handler(func=lambda m: True)
-def receber(msg):
+def process_message(text):
     try:
-        texto = msg.text.split(";")
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        if len(texto) != 5:
-            bot.reply_to(msg, "Formato inválido. Use:\nbitola;isolacao;tensao;cor;fabricante")
-            return
+        # Exemplo: consulta simples
+        cur.execute("SELECT * FROM produtos LIMIT 1;")
+        resultado = cur.fetchone()
 
-        bitola, isolacao, tensao, cor, fabricante = texto
+        cur.close()
+        conn.close()
 
-        conn = conectar()
-        cur = conn.cursor()
-
-        sql = """
-            SELECT *
-            FROM produtos
-            WHERE 
-                REPLACE(REPLACE(REPLACE(LOWER(Bitola), '.', ''), ',', ''), ' ', '') LIKE %s
-            AND REPLACE(REPLACE(REPLACE(LOWER(Isolacao), '.', ''), ',', ''), ' ', '') LIKE %s
-            AND REPLACE(REPLACE(REPLACE(LOWER(Tensao), '.', ''), ',', ''), ' ', '') LIKE %s
-            AND REPLACE(REPLACE(REPLACE(LOWER(Cor_Isolacao), '.', ''), ',', ''), ' ', '') LIKE %s
-            AND REPLACE(REPLACE(REPLACE(REPLACE(LOWER(Fabricante_Fantasia), '.', ''), ',', ''), ' ', ''), '-', '') LIKE %s
-            LIMIT 20;
-        """
-
-        cur.execute(sql, (
-            preparar(bitola),
-            preparar(isolacao),
-            preparar(tensao),
-            preparar(cor),
-            preparar(fabricante)
-        ))
-
-        linhas = cur.fetchall()
-        colunas = [desc[0] for desc in cur.description]
-
-        if not linhas:
-            bot.reply_to(msg, "Nenhum resultado encontrado.")
-            return
-
-        resposta = ""
-        for linha in linhas:
-            item = dict(zip(colunas, linha))
-            resposta += f"{item}\n\n"
-
-        bot.reply_to(msg, resposta)
+        if resultado:
+            return f"Produto encontrado: {resultado}"
+        else:
+            return "Nenhum produto encontrado."
 
     except Exception as e:
-        bot.reply_to(msg, f"Erro: {e}")
-        print("ERRO NO BOT:", e)
+        return f"Erro ao acessar o banco: {e}"
 
 # ============================
-# FLASK PARA MANTER O RENDER ATIVO
+# Handler do Telegram
 # ============================
-app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "Bot rodando no Render!"
-
-# ============================
-# THREAD PARA RODAR O BOT
-# ============================
-def iniciar_bot():
-    bot.infinity_polling()
+def handle_message(update, context):
+    texto = update.message.text
+    resposta = process_message(texto)
+    update.message.reply_text(resposta)
 
 # ============================
-# INICIAR FLASK + BOT
+# Inicialização do bot
 # ============================
+
+def main():
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+    if not TOKEN:
+        print("ERRO: TELEGRAM_TOKEN não encontrado nas variáveis de ambiente.")
+        return
+
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+    print("Bot iniciado...")
+    updater.start_polling()
+    updater.idle()
+
 if __name__ == "__main__":
-    threading.Thread(target=iniciar_bot).start()
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    main()
