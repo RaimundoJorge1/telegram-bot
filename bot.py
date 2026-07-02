@@ -24,8 +24,7 @@ def conectar():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASS"),
         database=os.getenv("DB_NAME"),
-        port=int(os.getenv("DB_PORT", "5432")
-
+        port=int(os.getenv("DB_PORT", "5432"))
     )
 
 # ============================
