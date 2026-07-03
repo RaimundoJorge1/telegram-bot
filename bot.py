@@ -4,9 +4,10 @@ from psycopg2.extras import RealDictCursor
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 import unicodedata
+import asyncio
 
 # ============================================================
-# Função para normalizar texto (remove acentos, espaços, etc.)
+# Função para normalizar texto
 # ============================================================
 
 def normalizar(texto):
@@ -47,7 +48,6 @@ def consultar_linha(texto_usuario):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        # Consulta robusta (ignora diferenças de caixa e espaços)
         cur.execute("""
             SELECT *
             FROM produtos
@@ -66,10 +66,6 @@ def consultar_linha(texto_usuario):
 
         if not resultado:
             return "Nenhum produto encontrado."
-
-        # ============================================================
-        # Formatação elegante da resposta
-        # ============================================================
 
         linhas = []
         linhas.append("📌 *Resultado da Consulta*")
@@ -100,19 +96,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(resposta, parse_mode="Markdown")
 
 # ============================================================
-# Inicialização do bot
+# Inicialização do bot (ASSÍNCRONO)
 # ============================================================
 
-def main():
-    # TOKEN = os.getenv("TELEGRAM_TOKEN")
-    TOKEN = "8833233090:AAFtpLC7dzhljwdU3z-Dn2q8KJm9oubdDko"
+async def main():
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
+    # TOKEN = "8833233090:AAFtpLC7dzhljwdU3z-Dn2q8KJm9oubdDko"
 
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Bot iniciado...")
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
