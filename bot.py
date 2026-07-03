@@ -3,6 +3,15 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+import unicodedata
+
+def normalizar(texto):
+    if texto is None:
+        return None
+    texto = texto.strip().upper()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return texto
 
 def get_connection():
     return psycopg2.connect(
@@ -16,24 +25,23 @@ def get_connection():
 
 def consultar_linha(texto_usuario):
     try:
-        conn = get_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-
         partes = texto_usuario.split(";")
-
         if len(partes) < 5:
             return "Entrada inválida. Use: bitola;isolacao;tensao;cor;fabricante"
 
-        bitola, isolacao, tensao, cor, fabricante = partes
+        bitola, isolacao, tensao, cor, fabricante = [normalizar(p) for p in partes]
+
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute("""
             SELECT *
             FROM produtos
-            WHERE bitola = %s
-              AND isolacao = %s
-              AND tensao = %s
-              AND cor_isolacao = %s
-              AND fabricante_fantasia = %s
+            WHERE UPPER(TRIM(bitola)) = %s
+              AND UPPER(TRIM(isolacao)) = %s
+              AND UPPER(TRIM(tensao)) = %s
+              AND UPPER(TRIM(cor_isolacao)) = %s
+              AND UPPER(TRIM(fabricante_fantasia)) = %s
             LIMIT 1;
         """, (bitola, isolacao, tensao, cor, fabricante))
 
@@ -54,7 +62,6 @@ def consultar_linha(texto_usuario):
                 valor_formatado = "Nãoconsta"
             else:
                 valor_formatado = str(valor)
-
             linhas.append(f"{campo}: {valor_formatado}")
 
         linhas.append("──────────────────────────")
