@@ -5,6 +5,10 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 import unicodedata
 
+# ============================================================
+# Função para normalizar texto (remove acentos, espaços, etc.)
+# ============================================================
+
 def normalizar(texto):
     if texto is None:
         return None
@@ -12,6 +16,10 @@ def normalizar(texto):
     texto = unicodedata.normalize("NFKD", texto)
     texto = "".join(c for c in texto if not unicodedata.combining(c))
     return texto
+
+# ============================================================
+# Conexão com o banco PostgreSQL (Render)
+# ============================================================
 
 def get_connection():
     return psycopg2.connect(
@@ -23,9 +31,14 @@ def get_connection():
         sslmode="require"
     )
 
+# ============================================================
+# Consulta ao banco
+# ============================================================
+
 def consultar_linha(texto_usuario):
     try:
         partes = texto_usuario.split(";")
+
         if len(partes) < 5:
             return "Entrada inválida. Use: bitola;isolacao;tensao;cor;fabricante"
 
@@ -34,6 +47,7 @@ def consultar_linha(texto_usuario):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
+        # Consulta robusta (ignora diferenças de caixa e espaços)
         cur.execute("""
             SELECT *
             FROM produtos
@@ -53,8 +67,12 @@ def consultar_linha(texto_usuario):
         if not resultado:
             return "Nenhum produto encontrado."
 
+        # ============================================================
+        # Formatação elegante da resposta
+        # ============================================================
+
         linhas = []
-        linhas.append("📌 Resultado da Consulta")
+        linhas.append("📌 *Resultado da Consulta*")
         linhas.append("──────────────────────────")
 
         for campo, valor in resultado.items():
@@ -62,7 +80,8 @@ def consultar_linha(texto_usuario):
                 valor_formatado = "Nãoconsta"
             else:
                 valor_formatado = str(valor)
-            linhas.append(f"{campo}: {valor_formatado}")
+
+            linhas.append(f"*{campo}*: {valor_formatado}")
 
         linhas.append("──────────────────────────")
 
@@ -71,15 +90,26 @@ def consultar_linha(texto_usuario):
     except Exception as e:
         return f"Erro ao acessar o banco: {e}"
 
+# ============================================================
+# Handler do Telegram
+# ============================================================
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text
     resposta = consultar_linha(texto)
-    await update.message.reply_text(resposta)
+    await update.message.reply_text(resposta, parse_mode="Markdown")
+
+# ============================================================
+# Inicialização do bot
+# ============================================================
 
 def main():
     TOKEN = os.getenv("TELEGRAM_TOKEN")
+
     app = ApplicationBuilder().token(TOKEN).build()
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
     print("Bot iniciado...")
     app.run_polling()
 
