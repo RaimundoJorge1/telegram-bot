@@ -1,7 +1,8 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from telegram.ext import Updater, MessageHandler, Filters
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
 # ============================
 # Conexão com o banco (Render)
@@ -14,11 +15,11 @@ def get_connection():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASS"),
         port=os.getenv("DB_PORT"),
-        sslmode="require"   # <<< ESSENCIAL PARA O RENDER
+        sslmode="require"
     )
 
 # ============================
-# Função que processa mensagens
+# Processamento da mensagem
 # ============================
 
 def process_message(text):
@@ -26,7 +27,7 @@ def process_message(text):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        # Exemplo: consulta simples
+        # Exemplo de consulta
         cur.execute("SELECT * FROM produtos LIMIT 1;")
         resultado = cur.fetchone()
 
@@ -42,13 +43,13 @@ def process_message(text):
         return f"Erro ao acessar o banco: {e}"
 
 # ============================
-# Handler do Telegram
+# Handler do Telegram (async)
 # ============================
 
-def handle_message(update, context):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text
     resposta = process_message(texto)
-    update.message.reply_text(resposta)
+    await update.message.reply_text(resposta)
 
 # ============================
 # Inicialização do bot
@@ -57,18 +58,12 @@ def handle_message(update, context):
 def main():
     TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-    if not TOKEN:
-        print("ERRO: TELEGRAM_TOKEN não encontrado nas variáveis de ambiente.")
-        return
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Bot iniciado...")
-    updater.start_polling()
-    updater.idle()
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
