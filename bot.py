@@ -4,10 +4,6 @@ from psycopg2.extras import RealDictCursor
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-# ============================
-# Conexão com o banco (Render)
-# ============================
-
 def get_connection():
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),
@@ -18,16 +14,11 @@ def get_connection():
         sslmode="require"
     )
 
-# ============================
-# Consulta ao banco
-# ============================
-
 def consultar_linha(texto_usuario):
     try:
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        # Divide entrada do usuário
         partes = texto_usuario.split(";")
 
         if len(partes) < 5:
@@ -35,7 +26,6 @@ def consultar_linha(texto_usuario):
 
         bitola, isolacao, tensao, cor, fabricante = partes
 
-        # Consulta
         cur.execute("""
             SELECT *
             FROM produtos
@@ -55,12 +45,8 @@ def consultar_linha(texto_usuario):
         if not resultado:
             return "Nenhum produto encontrado."
 
-        # ============================
-        # Formatação elegante
-        # ============================
-
         linhas = []
-        linhas.append("📌 *Resultado da Consulta*\n")
+        linhas.append("📌 Resultado da Consulta")
         linhas.append("──────────────────────────")
 
         for campo, valor in resultado.items():
@@ -69,7 +55,7 @@ def consultar_linha(texto_usuario):
             else:
                 valor_formatado = str(valor)
 
-            linhas.append(f"*{campo}*: {valor_formatado}")
+            linhas.append(f"{campo}: {valor_formatado}")
 
         linhas.append("──────────────────────────")
 
@@ -78,26 +64,15 @@ def consultar_linha(texto_usuario):
     except Exception as e:
         return f"Erro ao acessar o banco: {e}"
 
-# ============================
-# Handler do Telegram
-# ============================
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text
     resposta = consultar_linha(texto)
-    await update.message.reply_text(resposta, parse_mode="Markdown")
-
-# ============================
-# Inicialização do bot
-# ============================
+    await update.message.reply_text(resposta)
 
 def main():
     TOKEN = os.getenv("TELEGRAM_TOKEN")
-
     app = ApplicationBuilder().token(TOKEN).build()
-
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     print("Bot iniciado...")
     app.run_polling()
 
