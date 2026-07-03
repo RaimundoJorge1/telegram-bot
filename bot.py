@@ -4,6 +4,7 @@ from psycopg2.extras import RealDictCursor
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 import unicodedata
+from flask import Flask, request
 import asyncio
 
 # ============================================================
@@ -96,21 +97,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(resposta, parse_mode="Markdown")
 
 # ============================================================
-# Inicialização do bot — VERSÃO FINAL COMPATÍVEL COM PTB 21.x
+# WEBHOOK
+# ============================================================
+
+app_flask = Flask(__name__)
+
+@app_flask.route("/", methods=["POST"])
+def webhook():
+    json_update = request.get_json()
+    asyncio.get_event_loop().create_task(application.update_queue.put(json_update))
+    return "OK", 200
+
+# ============================================================
+# Inicialização do bot
 # ============================================================
 
 async def main():
-   # TOKEN = os.getenv("TELEGRAM_TOKEN")
+    global application
+
+    #TOKEN = os.getenv("TELEGRAM_TOKEN")
     TOKEN = "8833233090:AAFI8ptnJj6MB6aBD7lUfKH8AXsIpEizSHA"
-    app = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot iniciado...")
+    await application.initialize()
+    await application.start()
 
-    await app.initialize()
-    await app.start()
-    await app.run_polling()
+    print("Bot iniciado com webhook...")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
+    app_flask.run(host="0.0.0.0", port=10000)
