@@ -4,7 +4,6 @@ from psycopg2.extras import RealDictCursor
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 import unicodedata
-import asyncio
 
 # ============================================================
 # Função para normalizar texto
@@ -96,10 +95,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(resposta, parse_mode="Markdown")
 
 # ============================================================
-# Inicialização do bot (ASSÍNCRONO)
+# Inicialização do bot — MODO COMPATÍVEL COM RENDER
 # ============================================================
 
-async def main():
+def main():
     TOKEN = os.getenv("TELEGRAM_TOKEN")
     # TOKEN = "8833233090:AAFtpLC7dzhljwdU3z-Dn2q8KJm9oubdDko"
 
@@ -108,7 +107,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Bot iniciado...")
-    await app.run_polling()
+    app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
