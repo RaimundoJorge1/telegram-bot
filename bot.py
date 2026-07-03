@@ -101,7 +101,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     #TOKEN = os.getenv("TELEGRAM_TOKEN")
-    TOKEN = "8833233090:AAFtpLC7dzhljwdU3z-Dn2q8KJm9oubdDko"
+    TOKEN = "8833233090:AAFI8ptnJj6MB6aBD7lUfKH8AXsIpEizSHA"
 
     app = ApplicationBuilder().token(TOKEN).build()
 
