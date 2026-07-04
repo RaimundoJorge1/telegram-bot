@@ -74,7 +74,7 @@ def consultar_linha(texto_usuario):
 
         for campo, valor in resultado.items():
             if valor is None or (isinstance(valor, str) and valor.strip() == ""):
-                valor_formatado = "Nãoconsta"
+                valor_formatado = "Não consta"
             else:
                 valor_formatado = str(valor)
 
@@ -97,15 +97,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(resposta, parse_mode="Markdown")
 
 # ============================================================
-# WEBHOOK
+# WEBHOOK (Flask)
 # ============================================================
 
 app_flask = Flask(__name__)
+application = None  # Instanciado globalmente
 
 @app_flask.route("/", methods=["POST"])
 def webhook():
-    json_update = request.get_json()
-    asyncio.get_event_loop().create_task(application.update_queue.put(json_update))
+    if application:
+        json_update = request.get_json()
+        
+        # Cria um objeto Update do telegram com base nos dados do Flask
+        update = Update.de_json(json_update, application.bot)
+        
+        # Pega o loop atual de eventos para rodar a tarefa assíncrona de processamento
+        loop = asyncio.get_event_loop()
+        loop.create_task(application.process_update(update))
+        
     return "OK", 200
 
 # ============================================================
@@ -115,17 +124,29 @@ def webhook():
 async def main():
     global application
 
-    #TOKEN = os.getenv("TELEGRAM_TOKEN")
-    TOKEN = "8833233090:AAFI8ptnJj6MB6aBD7lUfKH8AXsIpEizSHA"
+    # ⚠️ RECOMENDAÇÃO: Use variáveis de ambiente para o token!
+    TOKEN = os.getenv("TELEGRAM_TOKEN", "8833233090:AAFI8ptnJj6MB6aBD7lUfKH8AXsIpEizSHA")
+    
     application = ApplicationBuilder().token(TOKEN).build()
-
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+    # Inicializa os componentes internos do bot sem abrir o polling tradicional
     await application.initialize()
     await application.start()
 
-    print("Bot iniciado com webhook...")
+    print("Bot iniciado internamente. Aguardando requisições do Flask...")
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
-    app_flask.run(host="0.0.0.0", port=10000)
+    # Correção crucial para Python 3.14+: Criar e configurar o loop de eventos explicitamente
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    # Executa a inicialização do Telegram
+    loop.run_until_complete(main())
+    
+    # Inicia o servidor Flask na porta do Render
+    port = int(os.environ.get("PORT", 10000))
+    app_flask.run(host="0.0.0.0", port=port)
