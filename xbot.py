@@ -88,17 +88,26 @@ def consultar_linha(texto_usuario):
         return f"Erro ao acessar o banco: {e}"
 
 # ============================================================
-# Handler do Telegram
+# Handler do Telegram (MODIFICADO COM RASTREAMENTO E PROTEÇÃO)
 # ============================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if not update.message or not update.message.text:
         return
 
     texto = update.message.text
+    print(f"[LOG] Mensagem recebida do Telegram: {texto}")
+
     resposta = consultar_linha(texto)
-    await update.message.reply_text(resposta, parse_mode="Markdown")
+    print(f"[LOG] Resposta gerada: {resposta}")
+
+    try:
+        # Tenta responder com a formatação Markdown ativa
+        await update.message.reply_text(resposta, parse_mode="Markdown")
+    except Exception as e:
+        print(f"[AVISO] Falha ao enviar Markdown (caractere inválido). Erro: {e}")
+        # Se falhar pelo Markdown, envia como texto puro para garantir a entrega
+        await update.message.reply_text(resposta)
 
 # ============================================================
 # FLASK + WEBHOOK (CORRIGIDO PARA THREADS)
@@ -129,7 +138,7 @@ def webhook():
             print("Erro ao decodificar update:", e)
             return "OK", 200
 
-        # Envia o update para o loop principal do bot
+        # Envia o update para o loop principal do bot com segurança
         asyncio.run_coroutine_threadsafe(
             application.process_update(update),
             main_loop
