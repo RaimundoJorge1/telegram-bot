@@ -35,7 +35,7 @@ def get_connection():
     )
 
 # ============================================================
-# Consulta ao banco
+# Consulta ao banco (Ajustado para não repetir termos buscados)
 # ============================================================
 
 def consultar_linha(texto_usuario):
@@ -69,11 +69,19 @@ def consultar_linha(texto_usuario):
         if not resultado:
             return "Nenhum produto encontrado."
 
+        # Lista de campos usados na busca que serão removidos do texto final
+        campos_ignorar = {"bitola", "isolacao", "tensao", "cor_isolacao", "fabricante_fantasia"}
+
         linhas = []
         linhas.append("📌 *Resultado da Consulta*")
         linhas.append("──────────────────────────")
 
         for campo, valor in resultado.items():
+            # Se a coluna atual for um dos critérios da busca, o robô pula ela
+            if campo.lower() in campos_ignorar:
+                continue
+
+            # Se o valor for nulo ou vazio, define como "Não consta"
             if valor is None or (isinstance(valor, str) and valor.strip() == ""):
                 valor_formatado = "Não consta"
             else:
@@ -89,7 +97,7 @@ def consultar_linha(texto_usuario):
         return f"Erro ao acessar o banco: {e}"
 
 # ============================================================
-# Handler do Telegram (MODIFICADO COM RASTREAMENTO E PROTEÇÃO)
+# Handler do Telegram
 # ============================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -103,11 +111,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"[LOG] Resposta gerada: {resposta}")
 
     try:
-        # Tenta responder com a formatação Markdown ativa
         await update.message.reply_text(resposta, parse_mode="Markdown")
     except Exception as e:
-        print(f"[AVISO] Falha ao enviar Markdown (caractere inválido). Erro: {e}")
-        # Se falhar pelo Markdown, envia como texto puro para garantir a entrega
+        print(f"[AVISO] Falha ao enviar Markdown. Erro: {e}")
         await update.message.reply_text(resposta)
 
 # ============================================================
@@ -131,8 +137,6 @@ def webhook():
     global application, main_loop
 
     json_update = request.get_json()
-
-    # Rastreio obrigatório para sabermos que o sinal chegou do Telegram
     print(f"[DEBUG Webhook] Requisição recebida do Telegram.")
 
     if not application or not main_loop:
@@ -141,8 +145,6 @@ def webhook():
 
     try:
         update = Update.de_json(json_update, application.bot)
-        
-        # Injeta a tarefa de processamento diretamente no loop assíncrono da outra Thread
         main_loop.call_soon_threadsafe(
             asyncio.create_task, 
             application.process_update(update)
@@ -176,17 +178,14 @@ async def start_bot():
 # ============================================================
 
 def rodar_bot_em_thread():
-    # Cria um loop de eventos isolado exclusivo para o Telegram rodar em segundo plano
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(start_bot())
     loop.run_forever()
 
 if __name__ == "__main__":
-    # 1. Dispara o bot do Telegram em uma Thread separada (Background)
     thread_telegram = Thread(target=rodar_bot_em_thread, daemon=True)
     thread_telegram.start()
 
-    # 2. Deixa a Thread principal rodando o servidor Flask livremente para o Render
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
