@@ -126,6 +126,7 @@ async def main():
 
     # Buscando o Token do ambiente e aplicando o .strip() para remover espaços e '\n'
     TOKEN = os.getenv("TELEGRAM_TOKEN")
+    TOKEN = "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
     if not TOKEN:
         raise ValueError("A variável de ambiente TELEGRAM_TOKEN não foi configurada!")
     
