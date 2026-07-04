@@ -102,7 +102,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(resposta, parse_mode="Markdown")
 
 # ============================================================
-# FLASK + WEBHOOK
+# FLASK + WEBHOOK (CORRIGIDO)
 # ============================================================
 
 app_flask = Flask(__name__)
@@ -118,7 +118,13 @@ def ping():
 def webhook():
     if application:
         json_update = request.get_json()
-        update = Update.de_json(json_update, application.bot)
+
+        # 🔥 Correção: evita erro 500 quando o Telegram envia updates inválidos
+        try:
+            update = Update.de_json(json_update, application.bot)
+        except Exception as e:
+            print("Erro ao decodificar update:", e)
+            return "OK", 200  # evita erro 500
 
         loop = asyncio.get_event_loop()
         loop.create_task(application.process_update(update))
@@ -132,7 +138,7 @@ def webhook():
 async def main():
     global application
 
-  #  TOKEN = os.getenv("TELEGRAM_TOKEN")
+    #TOKEN = os.getenv("TELEGRAM_TOKEN")
     TOKEN = "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
 
     if not TOKEN:
