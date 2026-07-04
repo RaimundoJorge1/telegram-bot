@@ -88,10 +88,15 @@ def consultar_linha(texto_usuario):
         return f"Erro ao acessar o banco: {e}"
 
 # ============================================================
-# Handler do Telegram
+# Handler do Telegram (CORRIGIDO)
 # ============================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # 🔥 Correção crucial: evita erro 500 quando update não tem texto
+    if not update.message or not update.message.text:
+        return
+
     texto = update.message.text
     resposta = consultar_linha(texto)
     await update.message.reply_text(resposta, parse_mode="Markdown")
@@ -127,7 +132,7 @@ def webhook():
 async def main():
     global application
 
-    #TOKEN = os.getenv("TELEGRAM_TOKEN")
+  #  TOKEN = os.getenv("TELEGRAM_TOKEN")
     TOKEN = "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
 
     if not TOKEN:
