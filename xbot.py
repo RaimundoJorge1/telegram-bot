@@ -106,7 +106,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app_flask = Flask(__name__)
 application = None
-main_loop = None   # 🔥 Loop principal do bot
+main_loop = None   # loop principal do bot
 
 @app_flask.route("/", methods=["GET", "HEAD"])
 def index():
@@ -129,7 +129,7 @@ def webhook():
             print("Erro ao decodificar update:", e)
             return "OK", 200
 
-        # 🔥 Envia o update para o loop principal do bot
+        # Envia o update para o loop principal do bot
         asyncio.run_coroutine_threadsafe(
             application.process_update(update),
             main_loop
@@ -144,7 +144,6 @@ def webhook():
 async def main():
     global application, main_loop
 
-    # 🔥 Captura o loop principal
     main_loop = asyncio.get_running_loop()
 
     TOKEN = os.getenv("TELEGRAM_TOKEN") or "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
