@@ -88,12 +88,11 @@ def consultar_linha(texto_usuario):
         return f"Erro ao acessar o banco: {e}"
 
 # ============================================================
-# Handler do Telegram (CORRIGIDO)
+# Handler do Telegram
 # ============================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    # 🔥 Correção crucial: evita erro 500 quando update não tem texto
     if not update.message or not update.message.text:
         return
 
@@ -102,32 +101,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(resposta, parse_mode="Markdown")
 
 # ============================================================
-# FLASK + WEBHOOK (CORRIGIDO)
+# FLASK + WEBHOOK (CORRIGIDO PARA THREADS)
 # ============================================================
 
 app_flask = Flask(__name__)
-application = None  # Instanciado globalmente
+application = None
+main_loop = None   # 🔥 Loop principal do bot
 
-# Rota para testar no navegador
+@app_flask.route("/", methods=["GET", "HEAD"])
+def index():
+    return "Bot está online e operacional!", 200
+
 @app_flask.route("/ping", methods=["GET"])
 def ping():
     return "Servidor ativo", 200
 
-# Rota do webhook
 @app_flask.route("/webhook", methods=["POST"])
 def webhook():
-    if application:
+    global application, main_loop
+
+    if application and main_loop:
         json_update = request.get_json()
 
-        # 🔥 Correção: evita erro 500 quando o Telegram envia updates inválidos
         try:
             update = Update.de_json(json_update, application.bot)
         except Exception as e:
             print("Erro ao decodificar update:", e)
-            return "OK", 200  # evita erro 500
+            return "OK", 200
 
-        loop = asyncio.get_event_loop()
-        loop.create_task(application.process_update(update))
+        # 🔥 Envia o update para o loop principal do bot
+        asyncio.run_coroutine_threadsafe(
+            application.process_update(update),
+            main_loop
+        )
 
     return "OK", 200
 
@@ -136,14 +142,12 @@ def webhook():
 # ============================================================
 
 async def main():
-    global application
+    global application, main_loop
 
-    #TOKEN = os.getenv("TELEGRAM_TOKEN")
-    TOKEN = "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
+    # 🔥 Captura o loop principal
+    main_loop = asyncio.get_running_loop()
 
-    if not TOKEN:
-        raise ValueError("A variável de ambiente TELEGRAM_TOKEN não foi configurada!")
-
+    TOKEN = os.getenv("TELEGRAM_TOKEN") or "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
     TOKEN = TOKEN.strip()
 
     application = ApplicationBuilder().token(TOKEN).build()
