@@ -6,6 +6,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 import unicodedata
 from flask import Flask, request
 import asyncio
+from threading import Thread
 
 # ============================================================
 # Função para normalizar texto
@@ -110,7 +111,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(resposta)
 
 # ============================================================
-# FLASK + WEBHOOK (ESTABILIZADO)
+# FLASK + WEBHOOK (ESTABILIZADO COM THREADS)
 # ============================================================
 
 app_flask = Flask(__name__)
@@ -141,7 +142,7 @@ def webhook():
     try:
         update = Update.de_json(json_update, application.bot)
         
-        # Injeta a tarefa com força e segurança diretamente no loop principal
+        # Injeta a tarefa de processamento diretamente no loop assíncrono da outra Thread
         main_loop.call_soon_threadsafe(
             asyncio.create_task, 
             application.process_update(update)
@@ -170,14 +171,22 @@ async def start_bot():
     await application.start()
     print("[SISTEMA] Telegram Bot iniciado com sucesso!")
 
-if __name__ == "__main__":
-    # Garante um loop de eventos limpo e isolado
+# ============================================================
+# Fluxo de Inicialização Principal com Threads Paralelas
+# ============================================================
+
+def rodar_bot_em_thread():
+    # Cria um loop de eventos isolado exclusivo para o Telegram rodar em segundo plano
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
-    # Executa a inicialização interna do bot do Telegram
     loop.run_until_complete(start_bot())
+    loop.run_forever()
 
-    # Na sequência, abre as portas do servidor Flask
+if __name__ == "__main__":
+    # 1. Dispara o bot do Telegram em uma Thread separada (Background)
+    thread_telegram = Thread(target=rodar_bot_em_thread, daemon=True)
+    thread_telegram.start()
+
+    # 2. Deixa a Thread principal rodando o servidor Flask livremente para o Render
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
