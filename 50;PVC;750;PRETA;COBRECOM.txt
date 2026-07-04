@@ -1,0 +1,2 @@
+50;PVC;750;PRETA;COBRECOM
+https://api.telegram.org/8833233090:AAFI8ptnJj6MB6aBD7lUfKH8AXsIpEizSHA/setWebhook?url=https://RainudoJorge1.onrender.com
