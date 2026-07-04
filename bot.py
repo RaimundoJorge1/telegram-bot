@@ -108,10 +108,10 @@ def webhook():
     if application:
         json_update = request.get_json()
         
-        # Cria um objeto Update do telegram com base nos dados do Flask
+        # Converte o JSON recebido em um objeto Update do Telegram
         update = Update.de_json(json_update, application.bot)
         
-        # Pega o loop atual de eventos para rodar a tarefa assíncrona de processamento
+        # Processa a mensagem de forma assíncrona no loop ativo
         loop = asyncio.get_event_loop()
         loop.create_task(application.process_update(update))
         
@@ -124,29 +124,33 @@ def webhook():
 async def main():
     global application
 
-    # ⚠️ RECOMENDAÇÃO: Use variáveis de ambiente para o token!
-    TOKEN = os.getenv("TELEGRAM_TOKEN", "8833233090:AAFI8ptnJj6MB6aBD7lUfKH8AXsIpEizSHA")
+    # Buscando o Token do ambiente e aplicando o .strip() para remover espaços e '\n'
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
+    if not TOKEN:
+        raise ValueError("A variável de ambiente TELEGRAM_TOKEN não foi configurada!")
+    
+    TOKEN = TOKEN.strip()
     
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Inicializa os componentes internos do bot sem abrir o polling tradicional
+    # Inicializa a estrutura do bot sem abrir o Polling interno
     await application.initialize()
     await application.start()
 
     print("Bot iniciado internamente. Aguardando requisições do Flask...")
 
 if __name__ == "__main__":
-    # Correção crucial para Python 3.14+: Criar e configurar o loop de eventos explicitamente
+    # Correção crucial para Python 3.14+: Garante a existência do Event Loop
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-    # Executa a inicialização do Telegram
+    # Inicializa o bot do Telegram
     loop.run_until_complete(main())
     
-    # Inicia o servidor Flask na porta do Render
+    # Inicia o servidor Flask usando a porta dinâmica fornecida pelo Render
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
