@@ -110,12 +110,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(resposta)
 
 # ============================================================
-# FLASK + WEBHOOK (CORRIGIDO PARA THREADS)
+# FLASK + WEBHOOK (ESTABILIZADO)
 # ============================================================
 
 app_flask = Flask(__name__)
 application = None
-main_loop = None   # loop principal do bot
+main_loop = None   
 
 @app_flask.route("/", methods=["GET", "HEAD"])
 def index():
@@ -129,20 +129,25 @@ def ping():
 def webhook():
     global application, main_loop
 
-    if application and main_loop:
-        json_update = request.get_json()
+    json_update = request.get_json()
 
-        try:
-            update = Update.de_json(json_update, application.bot)
-        except Exception as e:
-            print("Erro ao decodificar update:", e)
-            return "OK", 200
+    # Rastreio obrigatório para sabermos que o sinal chegou do Telegram
+    print(f"[DEBUG Webhook] Requisição recebida do Telegram.")
 
-        # Envia o update para o loop principal do bot com segurança
-        asyncio.run_coroutine_threadsafe(
-            application.process_update(update),
-            main_loop
+    if not application or not main_loop:
+        print("[ERRO CRÍTICO] Telegram Application ou Loop ainda não foram iniciados!")
+        return "Bot não iniciado", 200
+
+    try:
+        update = Update.de_json(json_update, application.bot)
+        
+        # Injeta a tarefa com força e segurança diretamente no loop principal
+        main_loop.call_soon_threadsafe(
+            asyncio.create_task, 
+            application.process_update(update)
         )
+    except Exception as e:
+        print("[ERRO Webhook] Falha ao processar update:", e)
 
     return "OK", 200
 
@@ -150,11 +155,11 @@ def webhook():
 # Inicialização do bot
 # ============================================================
 
-async def main():
+async def start_bot():
     global application, main_loop
-
+    
     main_loop = asyncio.get_running_loop()
-
+    
     TOKEN = os.getenv("TELEGRAM_TOKEN") or "8833233090:AAF-Sx76b0K84DmAFN7Xu6m4dvYzpJq9y24"
     TOKEN = TOKEN.strip()
 
@@ -163,17 +168,16 @@ async def main():
 
     await application.initialize()
     await application.start()
-
-    print("Bot iniciado internamente. Aguardando requisições do Flask...")
+    print("[SISTEMA] Telegram Bot iniciado com sucesso!")
 
 if __name__ == "__main__":
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # Garante um loop de eventos limpo e isolado
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Executa a inicialização interna do bot do Telegram
+    loop.run_until_complete(start_bot())
 
-    loop.run_until_complete(main())
-
+    # Na sequência, abre as portas do servidor Flask
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
